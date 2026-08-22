@@ -1,0 +1,43 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.navbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  z-index:1000;
+  padding:20px 50px;
+  background-color:#1a1a1a;
+  color:white;
+  box-sizing:border-box;
+}
+
+.navbar-links{
+  list-style-type:none;
+  display:flex;
+  gap:20px;
+}
+ul{
+  list-style-type: none;
+}
+.role-cards{
+  list-style-type:none;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.history{
+  display:flex;
+  justify-content:space-between;
+}
