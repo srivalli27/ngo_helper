@@ -29,18 +29,24 @@ export function Login(){
         <Navbar/>
         <b>Welcome to NGO helper</b>
         <form className="login-form" onSubmit={handleSubmit}>
-            <label>Email</label>
-            <input 
+            <label>Email
+                <input 
                 type="email"
                 value={email}
                 onChange={(e)=>setEmail(e.target.value)}
-            />
-            <label>Password</label>
-            <input
+                />
+                
+            </label>
+            
+            <label> Password
+                <input
                 type="password"
                 value={password}
                 onChange={(e)=>setPassword(e.target.value)}
-            />
+                />
+               
+            </label>
+            
             <button type="submit" >Login</button>
         </form>
         <p>Do not have an Account?
