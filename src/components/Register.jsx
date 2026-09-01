@@ -1,26 +1,37 @@
 import { useState } from 'react';
 export function Register(){
-    const [name,setName] = useState("");
+    /*const [name,setName] = useState("");
     const [email,setEmail] = useState("");
     const [password,setPassword] = useState("");
     const [confirmPassword,setConfirmPassword] = useState("");
-    const [role,setRole] = useState("");
+    const [role,setRole] = useState("");*/
+    const [error,setError] = useState("")
+    const [formData,setFormData]=useState({
+        name:"",
+        email:"",
+        password:"",
+        confirmPassword:"",
+        role:"",
+    });
     const handleChange=(e)=>{
-        setRole(e.target.value)
-    }
+        setFormData({
+            ...formData,
+            [e.target.name] : e.target.value
+    });
+        
+    };
     function handleSubmit(e){
         e.preventDefault();
-        if(!name || !email || !password || !confirmPassword || !role){
-            console.log("All fields are necessary");
+        if(!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.role){
+            setError("All fields are necessary");
             return;
         }
-        if(password!==confirmPassword){
-            console.log("Password and ConfirmPassword should be same");
+        if(formData.password!==formData.confirmPassword){
+            setError("Password and ConfirmPassword should be same");
             return;
         }
-        const userData={
-            name,email,password,role
-        }
+       setError("")
+        const userData=formData
         console.log(userData);
 
     }
@@ -28,20 +39,21 @@ export function Register(){
         <>
         <h3>Register</h3>
         <form onSubmit={ handleSubmit }>
+        {error && <p>{error}</p>}
             <label>Name
                 <input
-                type="name"
+                type="text"
                 name="name"
-                value={name}
-                onChange={(e=>setName(e.target.value))}
+                value={formData.name}
+                onChange={handleChange}
                 />
             </label>
             <label> Email
                 <input 
                 type="email" 
                 name="email" 
-                value={email}
-                onChange={(e)=>setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
                 required/>
                
             </label>
@@ -50,8 +62,8 @@ export function Register(){
                 <input 
                 type="password" 
                 name="password"
-                value={password}
-                onChange={(e)=>setPassword(e.target.value)}
+                value={formData.password}
+                onChange={handleChange}
                 required
                 />
                 
@@ -61,8 +73,8 @@ export function Register(){
                 <input
                 type="password"
                 name="confirmPassword"
-                value={confirmPassword}
-                onChange={(e)=>setConfirmPassword(e.target.value)}
+                value={formData.confirmPassword}
+                onChange={handleChange}
                 required
                 />
                
@@ -73,8 +85,8 @@ export function Register(){
                 <input
                 type="radio"
                 name="role"
-                value="Volunteer"
-                checked={role === "volunteer"}
+                value="volunteer"
+                checked={formData.role === "volunteer"}
                 onChange={handleChange}
                 />
                 Volunteer
@@ -84,7 +96,7 @@ export function Register(){
                 type="radio"
                 name="role"
                 value="ngo"
-                checked={role === "ngo"}
+                checked={formData.role === "ngo"}
                 onChange={handleChange}
                 />
                 NGO
