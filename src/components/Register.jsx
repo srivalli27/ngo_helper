@@ -17,8 +17,7 @@ export function Register(){
         setFormData({
             ...formData,
             [e.target.name] : e.target.value
-    });
-        
+        });
     };
     function handleSubmit(e){
         e.preventDefault();

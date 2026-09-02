@@ -10,6 +10,7 @@ function EventRow({ event,onApply,isApplied }) {
             <td>{event.date}</td>
             <td>{event.category}</td>
             <td>{event.spots}</td>
+            <td>{event.description}</td>
             <td>
                 <button onClick={() =>onApply(event)}>
                     {isApplied ? 'Applied': 'Apply'}
