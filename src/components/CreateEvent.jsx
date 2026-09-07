@@ -2,6 +2,8 @@ import {useState} from 'react';
 import { useNavigate } from 'react-router-dom';
 export function CreateEvent( {onCreate, successMessage}){
     const navigate = useNavigate();
+    const [eventImage, setEventImage] = useState(null);
+    const [loading, setLoading] = useState(false);
     const [formData,setFormData] = useState({
         title:"",
         location:"",
@@ -19,6 +21,7 @@ export function CreateEvent( {onCreate, successMessage}){
     };
     function handleSubmit(e){
         e.preventDefault();
+        e.setLoading(true);
         if(formData.date<new Date().toISOString().split('T')[0]){
             alert("Date cannot be in the past");
             return;
@@ -34,9 +37,21 @@ export function CreateEvent( {onCreate, successMessage}){
             ngo: formData.ngo,
             category: formData.category,
             spots: formData.spots,
-            description: formData.description
+            description: formData.description,
+            eventImage: eventImage
         };
+        const data = new FormData();
+        data.append("eventData", JSON.stringify(eventData));
+        if(eventImage){
+            data.append("eventImage", eventImage);
+        }
+        
+
         onCreate(eventData);
+        for (const item of data.entries()) {
+            console.log(item);
+        }
+        setLoading(false);
         setFormData({
             title:"",
             location:"",
@@ -47,10 +62,40 @@ export function CreateEvent( {onCreate, successMessage}){
             description:""
         });
     }
+    function handleFileChange(e){
+        const file = e.target.files[0];
+        if(!file) return;
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+        if(!allowedTypes.includes(file.type)){
+            alert("Please select a valid image file (png, jpg, jpeg, webp)");
+            return;
+        }
+        if(file.size > 5 * 1024 * 1024){
+            alert("File size should be less than 5MB");
+            return;
+        }
+        setEventImage(file);
+      
+        
+
+
+    }
     return(
         <>
             <form className="create-event-form" onSubmit={handleSubmit}>
                 <h1>Create Event</h1>
+                <label>
+                    <input
+                    type="file"
+                    name="eventImage"
+                    accept=".png,.jpg,.jpeg,.webp"
+
+                    onChange={handleFileChange}
+                    
+                    />
+                </label>
+                  {eventImage && <p>Selected: {eventImage.name}</p>}
+                  <button type="button" onClick={() => setEventImage(null)}>Remove Image</button>
                 <label >Title
                     <input
                 type="text"
@@ -121,7 +166,9 @@ export function CreateEvent( {onCreate, successMessage}){
                         required
                     />
                 </label>
-                <button type="submit">Create</button>
+                <button type="submit" disabled={loading}>
+                    {loading ? "Creating..." : "Create"}
+                </button>
                 {successMessage && <p className="success-message">{successMessage} </p>}
                 <button onClick={() => navigate("/events")}>Go to Events</button>
             </form>

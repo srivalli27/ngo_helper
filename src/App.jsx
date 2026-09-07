@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { BrowserRouter,Routes,Route } from 'react-router-dom'
 import Hero from './components/Hero.jsx'
-import { Login } from './components/login.jsx'
+import { Login } from './components/Login.jsx'
 import { Register } from './components/Register.jsx'
 import { CreateEvent } from './components/CreateEvent.jsx'
+import { ApiPractice } from './components/ApiPractice.jsx'
 import Events from './components/Events.jsx'
 import './App.css'
  
@@ -182,6 +183,9 @@ function handleCreateEvent(newEvent){
         setEvents([...events, eventWithId])
         setSuccessMessage("Event created successfully!");
     }
+    function handleDeleteEvent(event) {
+    setEvents(events.filter(e => e.id !== event.id));
+}
   return (
     <>
       <BrowserRouter>
@@ -189,8 +193,9 @@ function handleCreateEvent(newEvent){
         <Route path="/" element={<Hero/>}/>
         <Route path="/login" element={<Login/>} />
         <Route path="/register" element={<Register/>}/>
-        <Route path="/events" element={<Events events={events} />}/>
+        <Route path="/events" element={<Events events={events} ondelete={handleDeleteEvent}/>}/>
         <Route path="/create-event" element={<CreateEvent onCreate={handleCreateEvent} successMessage={successMessage}/>}/>
+        <Route path="/api-practice" element={<ApiPractice/>}/>
       </Routes>
       </BrowserRouter>
     </>

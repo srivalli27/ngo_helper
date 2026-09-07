@@ -1,4 +1,4 @@
-function EventRow({ event,onApply,isApplied }) {
+function EventRow({ event,onApply,isApplied,onRemove }) {
     
     return (
         <>
@@ -15,6 +15,9 @@ function EventRow({ event,onApply,isApplied }) {
                 <button onClick={() =>onApply(event)}>
                     {isApplied ? 'Applied': 'Apply'}
                 </button>
+            </td>
+            <td>
+                <button onClick={() => onRemove(event)}>Delete</button>
             </td>
         </tr>
         </>

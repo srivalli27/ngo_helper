@@ -45,27 +45,26 @@ export function Register(){
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
+                required
                 />
             </label>
             <label> Email
-                <input 
-                type="email" 
-                name="email" 
+                <input
+                type="email"
+                name="email"
                 value={formData.email}
                 onChange={handleChange}
-                required/>
-               
+                required
+                />
             </label>
-        
             <label>Password
-                <input 
-                type="password" 
+                <input
+                type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 required
                 />
-                
             </label>
             
             <label> Confirm Password
@@ -76,7 +75,6 @@ export function Register(){
                 onChange={handleChange}
                 required
                 />
-               
             </label>
             
             <p>Role</p>

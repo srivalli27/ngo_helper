@@ -1,13 +1,22 @@
 import { useState } from 'react';
 import EventRow from './EventRow';
-function Events({ events}){
+function Events({ events,ondelete}){
     const [search,setSearch]=useState("")
     const [location,setLocation]=useState("all")
     const [category,setCategory]=useState("all")
     const [sort,setSort]=useState("none")
     const [appliedEvents,setAppliedEvents]=useState([])
   
-    
+    function handleRemove(event){
+        const confirmDelete = window.confirm(`Are you sure you want to delete the event "${event.title}"?`);
+        if (confirmDelete) {
+            ondelete(event);
+            console.log(`Event "${event.title}" has been deleted.`);
+            // Here you would typically update the state or make an API call to remove the event from the backend.
+        } else {
+            console.log(`Event "${event.title}" deletion canceled.`);
+        }
+    }
     function handleApply(event){
         if(!appliedEvents.includes(event.id)){
             console.log('Applied for '+event.title)
@@ -110,7 +119,7 @@ function Events({ events}){
             </thead>
             <tbody>
                 {sortedEvents.map((event)=>(
-                <EventRow key={event.id} event={event} onApply={handleApply} isApplied={appliedEvents.includes(event.id)} />
+                <EventRow key={event.id} event={event} onApply={handleApply} isApplied={appliedEvents.includes(event.id)} onRemove={handleRemove} />
                 
                 ))}
             </tbody>
