@@ -1,8 +1,8 @@
-import { Navbar } from './Navbar.jsx'
+
 function Hero(){
     return(
         <>
-        <Navbar/>
+        
         <div className="hero">
             Connect. Volunteer. Make an Impact.
     

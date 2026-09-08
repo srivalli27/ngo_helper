@@ -1,22 +1,42 @@
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 import EventRow from './EventRow';
-function Events({ events,ondelete}){
+function Events({ events,setEvents,ondelete }) {
     const [search,setSearch]=useState("")
     const [location,setLocation]=useState("all")
     const [category,setCategory]=useState("all")
     const [sort,setSort]=useState("none")
     const [appliedEvents,setAppliedEvents]=useState([])
   
-    function handleRemove(event){
-        const confirmDelete = window.confirm(`Are you sure you want to delete the event "${event.title}"?`);
-        if (confirmDelete) {
-            ondelete(event);
-            console.log(`Event "${event.title}" has been deleted.`);
-            // Here you would typically update the state or make an API call to remove the event from the backend.
-        } else {
-            console.log(`Event "${event.title}" deletion canceled.`);
-        }
+    async function handleRemove(event) {
+    const confirmDelete = window.confirm(
+        `Are you sure you want to delete the event "${event.title}"?`
+    );
+
+    if (!confirmDelete) {
+        console.log(`Event "${event.title}" deletion canceled.`);
+        return;
     }
+
+    try {
+        const response = await fetch(
+            `http://localhost:5000/api/events/${event.id}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error("Failed to delete event");
+        }
+
+        ondelete(event);
+
+        console.log(`Event "${event.title}" has been deleted.`);
+
+    } catch (error) {
+        console.error("Error deleting event:", error);
+    }
+}
     function handleApply(event){
         if(!appliedEvents.includes(event.id)){
             console.log('Applied for '+event.title)
@@ -33,6 +53,21 @@ function Events({ events,ondelete}){
 
     
 
+
+    useEffect(() => {
+ 
+    const fetchEvents = async () => {
+        try {
+            const response = await fetch("http://localhost:5000/api/events");
+            const data = await response.json();
+            setEvents(data);
+        } catch (error) {
+            console.error("Error fetching events:", error);
+        }
+    };
+
+    fetchEvents();
+}, []);
 
     const filteredEvents = events.filter( (event)=> {
         const matchSearch = event.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -61,9 +96,7 @@ function Events({ events,ondelete}){
         }
     return(
         <>
-
-        
-
+        <div className="events-page">
 
         <h1>Volunteer Events</h1>
         
@@ -125,6 +158,7 @@ function Events({ events,ondelete}){
             </tbody>
         </table>
         )};
+        </div>
         </>
     )
 }

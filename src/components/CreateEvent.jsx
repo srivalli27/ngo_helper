@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import { useNavigate } from 'react-router-dom';
-export function CreateEvent( {onCreate, successMessage}){
+export function CreateEvent( { successMessage}){
     const navigate = useNavigate();
     const [eventImage, setEventImage] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -19,39 +19,47 @@ export function CreateEvent( {onCreate, successMessage}){
             [e.target.name] : e.target.value
         });
     };
-    function handleSubmit(e){
-        e.preventDefault();
-        e.setLoading(true);
-        if(formData.date<new Date().toISOString().split('T')[0]){
-            alert("Date cannot be in the past");
-            return;
-        }
-        if(formData.spots<=0){
-            alert("Spots should be greater than 0");
-            return;
-        }
-        const eventData = {
-            title: formData.title,
-            location: formData.location,
-            date: formData.date,
-            ngo: formData.ngo,
-            category: formData.category,
-            spots: formData.spots,
-            description: formData.description,
-            eventImage: eventImage
-        };
-        const data = new FormData();
-        data.append("eventData", JSON.stringify(eventData));
-        if(eventImage){
-            data.append("eventImage", eventImage);
-        }
-        
+    async function handleSubmit(e){
+    e.preventDefault();
 
-        onCreate(eventData);
-        for (const item of data.entries()) {
-            console.log(item);
+    if(formData.date < new Date().toISOString().split('T')[0]){
+        alert("Date cannot be in the past");
+        return;
+    }
+
+    if(formData.spots <= 0){
+        alert("Spots should be greater than 0");
+        return;
+    }
+
+    setLoading(true);
+
+    const eventData = {
+        title: formData.title,
+        location: formData.location,
+        date: formData.date,
+        ngo: formData.ngo,
+        category: formData.category,
+        spots: formData.spots,
+        description: formData.description
+    };
+
+    try {
+        const response = await fetch("http://localhost:5000/api/events", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(eventData)
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to create event");
         }
-        setLoading(false);
+
+        const result = await response.json();
+        console.log(result);
+
         setFormData({
             title:"",
             location:"",
@@ -61,7 +69,14 @@ export function CreateEvent( {onCreate, successMessage}){
             spots:0,
             description:""
         });
+
+    } catch (error) {
+        console.error("Error creating event:", error);
+
+    } finally {
+        setLoading(false);
     }
+}
     function handleFileChange(e){
         const file = e.target.files[0];
         if(!file) return;
@@ -94,8 +109,8 @@ export function CreateEvent( {onCreate, successMessage}){
                     
                     />
                 </label>
-                  {eventImage && <p>Selected: {eventImage.name}</p>}
-                  <button type="button" onClick={() => setEventImage(null)}>Remove Image</button>
+                {eventImage && <p>Selected: {eventImage.name}</p>}
+                <button type="button" onClick={() => setEventImage(null)}>Remove Image</button>
                 <label >Title
                     <input
                 type="text"

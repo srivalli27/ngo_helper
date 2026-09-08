@@ -15,7 +15,7 @@ export function ApiPractice(){
         the headers specify the content type of the request body specifically that it is in json format which helps the server understand how to parse the incoming data,
         the body contains the actual data being sent to the server in this case the title and description of a post which is converted to a json string using json.stringify()*/
         try{
-        const response = await fetch('https://jsonplaceholder.typicode.com/posts',{
+        const response = await fetch('http://localhost:5000/api/events',{
             method:"post",
             headers:{
                 "Content-Type": "application/json"
@@ -45,7 +45,7 @@ export function ApiPractice(){
     useEffect(() => {
         const fetchData = async () => {
             try{
-                const response = await fetch('https://jsonplaceholder.typicode.com/posts');
+                const response = await fetch('http://localhost:5000/api/events');
                 if(!response.ok){
                     throw new Error("Network response was not ok");
                 }

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Navbar } from './Navbar.jsx';
 export function Login(){
     const [email,setEmail] = useState("")
     const [password,setPassword] = useState("")
@@ -26,7 +25,6 @@ export function Login(){
     }
     return(
         <>
-        <Navbar/>
         <b>Welcome to NGO helper</b>
         <form className="login-form" onSubmit={handleSubmit}>
             <label>Email
