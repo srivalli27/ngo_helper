@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { supabase } from "../lib/supabaseClient";
 export function Register(){
     /*const [name,setName] = useState("");
     const [email,setEmail] = useState("");
@@ -19,21 +20,99 @@ export function Register(){
             [e.target.name] : e.target.value
         });
     };
-    function handleSubmit(e){
-        e.preventDefault();
-        if(!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.role){
-            setError("All fields are necessary");
-            return;
-        }
-        if(formData.password!==formData.confirmPassword){
-            setError("Password and ConfirmPassword should be same");
-            return;
-        }
-       setError("")
-        const userData=formData
-        console.log(userData);
+    async function handleSubmit(e) {
+    e.preventDefault();
 
+    if (
+        !formData.name ||
+        !formData.email ||
+        !formData.password ||
+        !formData.confirmPassword ||
+        !formData.role
+    ) {
+        setError("All fields are necessary");
+        return;
     }
+
+    if (formData.password !== formData.confirmPassword) {
+        setError("Password and ConfirmPassword should be same");
+        return;
+    }
+
+    setError("");
+
+    try {
+        const { data, error } = await supabase.auth.signUp({
+            email: formData.email,
+            password: formData.password
+        });
+
+        if (error) {
+            throw error;
+        }
+
+        const user = data.user;
+
+        console.log("USER:", user);
+console.log("SESSION:", data.session);
+        if (!user) {
+            throw new Error("User registration failed");
+        }
+
+        console.log("Auth user created:", user.id);
+
+        const { error: roleError } = await supabase
+            .from("user_roles")
+            .insert({
+                id: user.id,
+                role: formData.role
+            });
+
+        if (roleError) {
+            console.error("USER ROLE ERROR:", roleError);
+            throw roleError;
+        }
+
+        console.log("Role inserted successfully");
+
+        if (formData.role === "volunteer") {
+            const { error: volunteerError } = await supabase
+                .from("volunteer_profiles")
+                .insert({
+                    id: user.id,
+                    full_name: formData.name
+                });
+
+            if (volunteerError) {
+                console.error("VOLUNTEER PROFILE ERROR:", volunteerError);
+                throw volunteerError;
+            }
+
+            console.log("Volunteer profile inserted successfully");
+
+        } else {
+            const { error: ngoError } = await supabase
+                .from("ngo_profiles")
+                .insert({
+                    id: user.id,
+                    organization_name: formData.name
+                });
+
+            if (ngoError) {
+                console.error("NGO PROFILE ERROR:", ngoError);
+                throw ngoError;
+            }
+
+            console.log("NGO profile inserted successfully");
+        }
+
+        console.log("Registration successful");
+
+    } catch (error) {
+        console.error("REGISTRATION ERROR:", error);
+        setError(error.message);
+    }
+}
     return(
         <>
         <h3>Register</h3>
