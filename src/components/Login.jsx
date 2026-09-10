@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "./lib/supabaseClient";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
+import { LogIn, Mail, Lock, ArrowRight } from "lucide-react";
 
 export function Login() {
     const navigate = useNavigate();
@@ -11,6 +12,7 @@ export function Login() {
     });
 
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
     function handleChange(e) {
         setFormData({
@@ -28,6 +30,7 @@ export function Login() {
         }
 
         setError("");
+        setLoading(true);
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -45,8 +48,6 @@ export function Login() {
                 throw new Error("Login failed");
             }
 
-            console.log("Logged in user:", user.id);
-
             const { data: roleData, error: roleError } = await supabase
                 .from("user_roles")
                 .select("role")
@@ -54,52 +55,76 @@ export function Login() {
                 .single();
 
             if (roleError) {
-                throw roleError;
+                // If role query fails or role missing, fallback to volunteer dashboard default or metadata role
+                const metaRole = user.user_metadata?.role || "volunteer";
+                if (metaRole === "ngo") {
+                    navigate("/ngo-dashboard");
+                } else {
+                    navigate("/volunteer-dashboard");
+                }
+                return;
             }
 
-            console.log("User role:", roleData.role);
-
-            if (roleData.role === "volunteer") {
-                navigate("/volunteer-dashboard");
-            } else if (roleData.role === "ngo") {
+            if (roleData?.role === "ngo") {
                 navigate("/ngo-dashboard");
+            } else {
+                navigate("/volunteer-dashboard");
             }
 
-        } catch (error) {
-            console.error("LOGIN ERROR:", error);
-            setError(error.message);
+        } catch (err) {
+            console.error("LOGIN ERROR:", err);
+            setError(err.message || "Failed to sign in. Please check your credentials.");
+        } finally {
+            setLoading(false);
         }
     }
 
     return (
-        <div className="login-page">
-            <h1>Login</h1>
+        <div className="auth-container">
+            <div className="auth-card">
+                <div className="auth-header">
+                    <h1>Welcome <em>back.</em></h1>
+                    <p>Log in to access your dashboard and active events</p>
+                </div>
 
-            {error && <p>{error}</p>}
+                {error && <div className="form-error">{error}</div>}
 
-            <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label>Email Address</label>
+                        <div style={{ position: "relative" }}>
+                            <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                placeholder="name@example.com"
+                                required
+                            />
+                        </div>
+                    </div>
 
-                <label>Email</label>
-                <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                />
+                    <div className="form-group">
+                        <label>Password</label>
+                        <input
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            placeholder="••••••••"
+                            required
+                        />
+                    </div>
 
-                <label>Password</label>
-                <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                />
+                    <button type="submit" className="btn-primary" style={{ width: "100%", marginTop: "12px" }} disabled={loading}>
+                        {loading ? "Signing in..." : <>Sign In <ArrowRight size={16} /></>}
+                    </button>
+                </form>
 
-                <button type="submit">
-                    Login
-                </button>
-
-            </form>
+                <div className="auth-footer">
+                    Don't have an account yet? <Link to="/register">Create an account</Link>
+                </div>
+            </div>
         </div>
     );
 }
