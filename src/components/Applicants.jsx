@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import { User, Check, X, Award, MapPin, Calendar, Phone, Sparkles } from "lucide-react";
+import { User, Check, X, Award, Calendar, RefreshCw } from "lucide-react";
 
 export default function Applicants() {
     const { user } = useAuth();
@@ -10,60 +10,20 @@ export default function Applicants() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function fetchApplicants() {
-            setLoading(true);
+    async function fetchApplicants() {
+        if (!user) return;
+        setLoading(true);
+        setError("");
 
-            if (!user) {
-                // Demo fallback applicant card displaying complete volunteer details and past work
-                const sampleApp = [
-                    {
-                        id: 1,
-                        status: "applied",
-                        volunteer_id: "sample-vol-1",
-                        events: {
-                            id: 101,
-                            title: "Hussain Sagar Lake Cleanliness & Eco Drive",
-                            date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                            location: "Hyderabad",
-                            spots: 25,
-                            ngo_id: "sample-ngo-1"
-                        },
-                        volunteer_profiles: {
-                            full_name: "Ananya Verma",
-                            location: "Hyderabad",
-                            skills: ["Teaching", "Public Speaking", "Event Planning"],
-                            interests: ["Environment", "Education"],
-                            availability: "Weekends",
-                            phone: "+91 99887 76655",
-                            bio: "Passionate environmentalist and computer science student keen to contribute to community welfare and lake restoration drives."
-                        }
-                    }
-                ];
-
-                setApplications(sampleApp);
-                setPastWork({
-                    "sample-vol-1": [
-                        {
-                            status: "completed",
-                            events: { title: "Urban Sapling Plantation Drive", date: "2026-08-15", category: "Environment" }
-                        },
-                        {
-                            status: "completed",
-                            events: { title: "After-School Literacy Workshop", date: "2026-07-10", category: "Education" }
-                        }
-                    ]
-                });
-                setLoading(false);
-                return;
-            }
-
-            const { data, error } = await supabase
+        try {
+            // Query applications for events hosted by this NGO
+            const { data, error: appError } = await supabase
                 .from("applications")
                 .select(`
                     id,
                     status,
                     volunteer_id,
+                    created_at,
                     events!inner(id, title, date, location, spots, ngo_id),
                     volunteer_profiles(full_name, location, skills, interests, availability, bio, phone)
                 `)
@@ -71,62 +31,29 @@ export default function Applicants() {
                 .neq("status", "cancelled")
                 .order("created_at", { ascending: false });
 
-            if (error) {
-                console.error("APPLICANTS ERROR:", error);
-                setError(error.message);
+            if (appError) {
+                console.error("APPLICANTS QUERY ERROR:", appError);
+                setError(appError.message);
                 setLoading(false);
                 return;
             }
 
-            let apps = data || [];
+            const apps = data || [];
+            setApplications(apps);
 
-            if (apps.length === 0) {
-                // If database has no applications yet, show sample candidate card to demonstrate functionality
-                apps = [
-                    {
-                        id: 101,
-                        status: "applied",
-                        volunteer_id: "sample-vol-1",
-                        events: {
-                            id: 101,
-                            title: "Hussain Sagar Lake Cleanliness Drive",
-                            date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                            location: "Hyderabad",
-                            spots: 25,
-                            ngo_id: user.id
-                        },
-                        volunteer_profiles: {
-                            full_name: "Ananya Verma",
-                            location: "Hyderabad",
-                            skills: ["Teaching", "Public Speaking", "Event Planning"],
-                            interests: ["Environment", "Education"],
-                            availability: "Weekends",
-                            phone: "+91 99887 76655",
-                            bio: "Passionate environmentalist keen to contribute to community welfare."
-                        }
-                    }
-                ];
+            // Fetch past work history for all applicants
+            const volunteerIds = [...new Set(apps.map((item) => item.volunteer_id))];
 
-                setPastWork({
-                    "sample-vol-1": [
-                        {
-                            status: "completed",
-                            events: { title: "Urban Sapling Plantation Drive", date: "2026-08-15", category: "Environment" }
-                        }
-                    ]
-                });
-            } else {
-                const volunteerIds = [...new Set(apps.map((item) => item.volunteer_id))];
+            if (volunteerIds.length > 0) {
+                const { data: history, error: historyError } = await supabase
+                    .from("applications")
+                    .select("volunteer_id, status, events(title, date, category)")
+                    .in("volunteer_id", volunteerIds)
+                    .in("status", ["accepted", "completed"]);
 
-                if (volunteerIds.length > 0) {
-                    const { data: history } = await supabase
-                        .from("applications")
-                        .select("volunteer_id, status, events(title, date, category)")
-                        .in("volunteer_id", volunteerIds)
-                        .in("status", ["accepted", "completed"]);
-
+                if (!historyError && history) {
                     const grouped = {};
-                    (history || []).forEach((item) => {
+                    history.forEach((item) => {
                         if (!grouped[item.volunteer_id]) {
                             grouped[item.volunteer_id] = [];
                         }
@@ -135,16 +62,22 @@ export default function Applicants() {
                     setPastWork(grouped);
                 }
             }
-
-            setApplications(apps);
+        } catch (err) {
+            console.error("FETCH ERROR:", err);
+            setError(err.message);
+        } finally {
             setLoading(false);
         }
+    }
 
+    useEffect(() => {
         fetchApplicants();
     }, [user]);
 
-    async function handleDecision(application, status) {
-        if (status === "accepted") {
+    async function handleDecision(application, newStatus) {
+        setError("");
+
+        if (newStatus === "accepted") {
             const acceptedCount = applications.filter(
                 (item) =>
                     item.events?.id === application.events?.id &&
@@ -152,29 +85,41 @@ export default function Applicants() {
             ).length;
 
             if (acceptedCount >= application.events.spots) {
-                setError(`No spots remaining for "${application.events.title}". Total spots needed: ${application.events.spots}`);
+                setError(`Cannot accept: All ${application.events.spots} spots for "${application.events.title}" are full.`);
                 return;
             }
         }
 
-        if (user) {
-            const { error } = await supabase
+        try {
+            const { error: updateError } = await supabase
                 .from("applications")
-                .update({ status })
+                .update({ status: newStatus })
                 .eq("id", application.id);
 
-            if (error) {
-                setError(error.message);
+            if (updateError) {
+                console.error("UPDATE ERROR:", updateError);
+                setError(`Failed to update application: ${updateError.message}`);
                 return;
             }
-        }
 
-        setApplications(
-            applications.map((item) =>
-                item.id === application.id ? { ...item, status } : item
-            )
+            // Immediately update local state so UI reflects the decision
+            setApplications((prevApps) =>
+                prevApps.map((item) =>
+                    item.id === application.id ? { ...item, status: newStatus } : item
+                )
+            );
+        } catch (err) {
+            console.error("DECISION EXCEPTION:", err);
+            setError(err.message);
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="events-page" style={{ textAlign: "center", padding: "60px 24px" }}>
+                <p style={{ color: "var(--color-text-muted)" }}>Loading volunteer applications...</p>
+            </div>
         );
-        setError("");
     }
 
     return (
@@ -182,17 +127,22 @@ export default function Applicants() {
             <div className="page-header">
                 <div>
                     <h1>Volunteer <em>Applicants.</em></h1>
-                    <p style={{ color: "var(--color-text-muted)" }}>Review volunteer background, skills, and past work before accepting</p>
+                    <p style={{ color: "var(--color-text-muted)" }}>Review volunteer details and past contributions to approve or decline</p>
                 </div>
+                <button type="button" className="btn-secondary btn-sm" onClick={fetchApplicants}>
+                    <RefreshCw size={14} /> Refresh
+                </button>
             </div>
 
             {error && <div className="form-error">{error}</div>}
 
             {applications.length === 0 ? (
                 <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
-                    <User size={32} color="var(--color-text-light)" style={{ marginBottom: "12px" }} />
-                    <h3>No applicant submissions yet</h3>
-                    <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>Applications will appear here as volunteers apply to your drives.</p>
+                    <User size={36} color="var(--color-text-light)" style={{ marginBottom: "12px" }} />
+                    <h3>No volunteer applications yet</h3>
+                    <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>
+                        Applications will appear here as volunteers discover and apply for your posted drives.
+                    </p>
                 </div>
             ) : (
                 <div className="applicant-grid">
@@ -231,14 +181,14 @@ export default function Applicants() {
                                 </div>
 
                                 <div style={{ marginBottom: "12px" }}>
-                                    <strong style={{ fontSize: "0.825rem", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Skills & Capabilities:</strong>
+                                    <strong style={{ fontSize: "0.825rem", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Skills:</strong>
                                     <div className="tag-list">
                                         {(volunteer.skills || []).length > 0 ? (
                                             (volunteer.skills || []).map((skill, idx) => (
                                                 <span className="tag-pill" key={idx}>{skill}</span>
                                             ))
                                         ) : (
-                                            <span style={{ fontSize: "0.85rem", color: "var(--color-text-light)" }}>None specified</span>
+                                            <span style={{ fontSize: "0.85rem", color: "var(--color-text-light)" }}>None listed</span>
                                         )}
                                     </div>
                                 </div>
@@ -251,7 +201,7 @@ export default function Applicants() {
                                                 <span className="tag-pill" key={idx} style={{ background: "var(--bg-mint)" }}>{interest}</span>
                                             ))
                                         ) : (
-                                            <span style={{ fontSize: "0.85rem", color: "var(--color-text-light)" }}>None specified</span>
+                                            <span style={{ fontSize: "0.85rem", color: "var(--color-text-light)" }}>None listed</span>
                                         )}
                                     </div>
                                 </div>
@@ -266,25 +216,25 @@ export default function Applicants() {
                                 <div className="past-work-box">
                                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                                         <Award size={14} color="var(--color-mint-text)" />
-                                        <h5>Volunteer Past Work & Participation ({historyList.length})</h5>
+                                        <h5 style={{ margin: 0 }}>Volunteer Past Work & Participation ({historyList.length})</h5>
                                     </div>
                                     {historyList.length === 0 ? (
-                                        <p style={{ fontSize: "0.825rem", color: "var(--color-text-muted)" }}>First-time applicant on NGO Helper.</p>
+                                        <p style={{ fontSize: "0.825rem", color: "var(--color-text-muted)" }}>No past accepted events recorded yet.</p>
                                     ) : (
                                         <ul className="past-work-list">
                                             {historyList.map((item, index) => (
                                                 <li key={index}>
                                                     <span style={{ color: "var(--color-mint-text)" }}>✓</span>
-                                                    <strong>{item.events?.title}</strong> — {item.events?.date} ({item.events?.category || "General"})
+                                                    <strong>{item.events?.title}</strong> — {item.events?.date} ({item.status})
                                                 </li>
                                             ))}
                                         </ul>
                                     )}
                                 </div>
 
-                                {/* ACTIONS */}
-                                {application.status === "applied" && (
-                                    <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
+                                {/* ACTION BUTTONS */}
+                                <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
+                                    {application.status !== "accepted" && (
                                         <button
                                             type="button"
                                             className="btn-primary btn-sm"
@@ -293,22 +243,18 @@ export default function Applicants() {
                                         >
                                             <Check size={14} /> Accept Candidate
                                         </button>
+                                    )}
+                                    {application.status !== "rejected" && (
                                         <button
                                             type="button"
                                             className="btn-secondary btn-sm"
                                             onClick={() => handleDecision(application, "rejected")}
                                             style={{ flex: 1, color: "#B91C1C", borderColor: "#FECACA" }}
                                         >
-                                            <X size={14} /> Decline
+                                            <X size={14} /> Decline Application
                                         </button>
-                                    </div>
-                                )}
-
-                                {application.status === "accepted" && (
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "12px" }}>
-                                        <span style={{ fontSize: "0.875rem", color: "var(--color-mint-text)", fontWeight: 600 }}>
-                                            ✓ Volunteer Accepted
-                                        </span>
+                                    )}
+                                    {application.status === "accepted" && (
                                         <button
                                             type="button"
                                             className="btn-secondary btn-sm"
@@ -316,8 +262,8 @@ export default function Applicants() {
                                         >
                                             Mark Drive Completed
                                         </button>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         );
                     })}

@@ -8,20 +8,36 @@ export function AuthProvider({ children }) {
     const [role, setRole] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    async function fetchRole(userId) {
-        const { data, error } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("id", userId)
-            .single();
-
-        if (error) {
-            console.error("ROLE ERROR:", error);
+    async function fetchRole(currentUser) {
+        if (!currentUser) {
             setRole(null);
             return;
         }
 
-        setRole(data.role);
+        try {
+            const { data, error } = await supabase
+                .from("user_roles")
+                .select("role")
+                .eq("id", currentUser.id)
+                .maybeSingle();
+
+            if (data?.role) {
+                setRole(data.role);
+                return;
+            }
+
+            // Fallback to metadata if set during sign up
+            const metaRole = currentUser.user_metadata?.role;
+            if (metaRole) {
+                setRole(metaRole);
+                return;
+            }
+
+            setRole(null);
+        } catch (err) {
+            console.error("ROLE FETCH ERROR:", err);
+            setRole(currentUser.user_metadata?.role || null);
+        }
     }
 
     useEffect(() => {
@@ -30,7 +46,7 @@ export function AuthProvider({ children }) {
             setUser(currentUser);
 
             if (currentUser) {
-                fetchRole(currentUser.id).finally(() => setLoading(false));
+                fetchRole(currentUser).finally(() => setLoading(false));
             } else {
                 setLoading(false);
             }
@@ -41,7 +57,7 @@ export function AuthProvider({ children }) {
             setUser(currentUser);
 
             if (currentUser) {
-                fetchRole(currentUser.id);
+                fetchRole(currentUser);
             } else {
                 setRole(null);
             }
@@ -57,7 +73,7 @@ export function AuthProvider({ children }) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, role, loading, logout }}>
+        <AuthContext.Provider value={{ user, role, loading, logout, refetchRole: () => user && fetchRole(user) }}>
             {children}
         </AuthContext.Provider>
     );

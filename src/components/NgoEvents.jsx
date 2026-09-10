@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import { Plus, Trash2, Users, MapPin, Calendar } from "lucide-react";
+import { Plus, Trash2, Users, MapPin, Calendar, RefreshCw } from "lucide-react";
 
 export default function NgoEvents() {
     const { user } = useAuth();
@@ -10,75 +10,35 @@ export default function NgoEvents() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function fetchEvents() {
-            setLoading(true);
+    async function fetchEvents() {
+        if (!user) return;
+        setLoading(true);
+        setError("");
 
-            if (!user) {
-                // Demo fallback NGO events
-                setEvents([
-                    {
-                        id: 1,
-                        title: "Hussain Sagar Lake Cleanliness Drive",
-                        location: "Hyderabad",
-                        date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                        category: "Environment",
-                        spots: 25,
-                        applications: [
-                            { id: 1, status: "accepted" },
-                            { id: 2, status: "applied" }
-                        ]
-                    },
-                    {
-                        id: 2,
-                        title: "Urban Sapling Plantation Marathon",
-                        location: "Hyderabad",
-                        date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                        category: "Environment",
-                        spots: 40,
-                        applications: []
-                    }
-                ]);
-                setLoading(false);
-                return;
-            }
-
-            const { data, error } = await supabase
+        try {
+            const { data, error: fetchErr } = await supabase
                 .from("events")
                 .select("*, applications(id, status)")
                 .eq("ngo_id", user.id)
                 .order("date", { ascending: true });
 
-            if (error) {
-                console.error("Error fetching events:", error);
-                setError(error.message);
+            if (fetchErr) {
+                console.error("Error fetching events:", fetchErr);
+                setError(fetchErr.message);
                 setLoading(false);
                 return;
             }
 
-            if (!data || data.length === 0) {
-                // Initial demo display if database has no events for this NGO yet
-                setEvents([
-                    {
-                        id: 1,
-                        title: "Hussain Sagar Lake Cleanliness Drive",
-                        location: "Hyderabad",
-                        date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                        category: "Environment",
-                        spots: 25,
-                        applications: [
-                            { id: 1, status: "accepted" },
-                            { id: 2, status: "applied" }
-                        ]
-                    }
-                ]);
-            } else {
-                setEvents(data);
-            }
-
+            setEvents(data || []);
+        } catch (err) {
+            console.error("NGO EVENTS EXCEPTION:", err);
+            setError(err.message);
+        } finally {
             setLoading(false);
         }
+    }
 
+    useEffect(() => {
         fetchEvents();
     }, [user]);
 
@@ -92,18 +52,18 @@ export default function NgoEvents() {
         }
 
         if (user) {
-            const { error } = await supabase
+            const { error: deleteErr } = await supabase
                 .from("events")
                 .delete()
                 .eq("id", event.id);
 
-            if (error) {
-                setError(error.message);
+            if (deleteErr) {
+                setError(deleteErr.message);
                 return;
             }
         }
 
-        setEvents(events.filter((item) => item.id !== event.id));
+        setEvents((prev) => prev.filter((item) => item.id !== event.id));
     }
 
     return (
@@ -113,14 +73,23 @@ export default function NgoEvents() {
                     <h1>Hosted <em>Events.</em></h1>
                     <p style={{ color: "var(--color-text-muted)" }}>Manage active community drives and volunteer capacity</p>
                 </div>
-                <Link to="/ngo-dashboard/create" className="btn-primary">
-                    <Plus size={16} /> Post New Event
-                </Link>
+                <div style={{ display: "flex", gap: "10px" }}>
+                    <button type="button" className="btn-secondary btn-sm" onClick={fetchEvents}>
+                        <RefreshCw size={14} /> Refresh
+                    </button>
+                    <Link to="/ngo-dashboard/create" className="btn-primary">
+                        <Plus size={16} /> Post New Event
+                    </Link>
+                </div>
             </div>
 
             {error && <div className="form-error">{error}</div>}
 
-            {events.length === 0 ? (
+            {loading ? (
+                <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
+                    <p style={{ color: "var(--color-text-muted)" }}>Loading events...</p>
+                </div>
+            ) : events.length === 0 ? (
                 <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
                     <h3>No events posted yet</h3>
                     <p style={{ color: "var(--color-text-muted)", marginTop: "4px", marginBottom: "16px" }}>

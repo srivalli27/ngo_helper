@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import { CheckCircle2, Clock, XCircle, MapPin, Calendar } from "lucide-react";
+import { Clock, MapPin, Calendar } from "lucide-react";
 
 export default function AppliedEvents() {
     const { user } = useAuth();
@@ -11,96 +11,61 @@ export default function AppliedEvents() {
 
     useEffect(() => {
         async function fetchApplications() {
+            if (!user) return;
             setLoading(true);
+            setError("");
 
-            if (!user) {
-                // Demo fallback
-                setApplications([
-                    {
-                        id: 1,
-                        status: "accepted",
-                        events: {
-                            title: "Hussain Sagar Lake Cleanliness Drive",
-                            location: "Hyderabad",
-                            date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                            category: "Environment",
-                            ngo_profiles: { organization_name: "Green Earth Foundation" }
-                        }
-                    },
-                    {
-                        id: 2,
-                        status: "applied",
-                        events: {
-                            title: "Free Eye Screening Camp",
-                            location: "Bangalore",
-                            date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                            category: "Healthcare",
-                            ngo_profiles: { organization_name: "Hope Healthcare Trust" }
-                        }
-                    }
-                ]);
-                setLoading(false);
-                return;
-            }
+            try {
+                const today = new Date().toISOString().split("T")[0];
 
-            const today = new Date().toISOString().split("T")[0];
+                const { data, error: fetchErr } = await supabase
+                    .from("applications")
+                    .select("id, status, events(title, location, date, category, ngo_profiles(organization_name))")
+                    .eq("volunteer_id", user.id)
+                    .neq("status", "cancelled");
 
-            const { data, error } = await supabase
-                .from("applications")
-                .select("id, status, events(title, location, date, category, ngo_profiles(organization_name))")
-                .eq("volunteer_id", user.id)
-                .neq("status", "cancelled");
+                if (fetchErr) {
+                    console.error("APPLICATION FETCH ERROR:", fetchErr);
+                    setError(fetchErr.message);
+                    setLoading(false);
+                    return;
+                }
 
-            if (error) {
-                console.error("APPLICATION ERROR:", error);
-                setError(error.message);
-                setLoading(false);
-                return;
-            }
+                const activeApps = (data || []).filter(
+                    (application) => application.events && application.events.date >= today
+                );
 
-            const activeApps = (data || []).filter(
-                (application) => application.events && application.events.date >= today
-            );
-
-            if (activeApps.length === 0) {
-                // If user has no active DB apps yet, provide initial sample display
-                setApplications([
-                    {
-                        id: 101,
-                        status: "accepted",
-                        events: {
-                            title: "Hussain Sagar Lake Cleanliness Drive",
-                            location: "Hyderabad",
-                            date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                            category: "Environment",
-                            ngo_profiles: { organization_name: "Green Earth Foundation" }
-                        }
-                    }
-                ]);
-            } else {
                 setApplications(activeApps);
+            } catch (err) {
+                console.error("EXCEPTION:", err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
             }
-
-            setLoading(false);
         }
 
         fetchApplications();
     }, [user]);
 
     async function handleCancel(application) {
-        if (user) {
-            const { error } = await supabase
+        if (!user) return;
+        setError("");
+
+        try {
+            const { error: cancelErr } = await supabase
                 .from("applications")
                 .update({ status: "cancelled" })
                 .eq("id", application.id);
 
-            if (error) {
-                setError(error.message);
+            if (cancelErr) {
+                setError(cancelErr.message);
                 return;
             }
-        }
 
-        setApplications(applications.filter((item) => item.id !== application.id));
+            setApplications((prev) => prev.filter((item) => item.id !== application.id));
+        } catch (err) {
+            setError(err.message);
+        }
     }
 
     return (
@@ -114,7 +79,11 @@ export default function AppliedEvents() {
 
             {error && <div className="form-error">{error}</div>}
 
-            {applications.length === 0 ? (
+            {loading ? (
+                <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
+                    <p style={{ color: "var(--color-text-muted)" }}>Loading applications...</p>
+                </div>
+            ) : applications.length === 0 ? (
                 <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
                     <Clock size={32} color="var(--color-text-light)" style={{ marginBottom: "12px" }} />
                     <h3>No active applications</h3>

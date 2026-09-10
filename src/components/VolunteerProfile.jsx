@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import { SAMPLE_VOLUNTEER_PROFILE } from "../lib/mockData";
-import { Save, User, CheckCircle2 } from "lucide-react";
+import { Save, CheckCircle2 } from "lucide-react";
 
 function toArray(value) {
     if (Array.isArray(value)) return value;
@@ -29,27 +28,16 @@ export default function VolunteerProfile() {
 
     useEffect(() => {
         async function fetchProfile() {
-            if (!user) {
-                setFormData({
-                    full_name: SAMPLE_VOLUNTEER_PROFILE.full_name,
-                    phone: SAMPLE_VOLUNTEER_PROFILE.phone,
-                    location: SAMPLE_VOLUNTEER_PROFILE.location,
-                    bio: SAMPLE_VOLUNTEER_PROFILE.bio,
-                    skills: SAMPLE_VOLUNTEER_PROFILE.skills.join(", "),
-                    interests: SAMPLE_VOLUNTEER_PROFILE.interests.join(", "),
-                    availability: SAMPLE_VOLUNTEER_PROFILE.availability
-                });
-                return;
-            }
+            if (!user) return;
 
-            const { data, error } = await supabase
+            const { data, error: profileErr } = await supabase
                 .from("volunteer_profiles")
                 .select("*")
                 .eq("id", user.id)
                 .maybeSingle();
 
-            if (error) {
-                console.error("PROFILE ERROR:", error);
+            if (profileErr) {
+                console.error("PROFILE FETCH ERROR:", profileErr);
             }
 
             if (data) {
@@ -63,15 +51,11 @@ export default function VolunteerProfile() {
                     availability: data.availability || ""
                 });
             } else {
-                setFormData({
-                    full_name: SAMPLE_VOLUNTEER_PROFILE.full_name,
-                    phone: SAMPLE_VOLUNTEER_PROFILE.phone,
-                    location: SAMPLE_VOLUNTEER_PROFILE.location,
-                    bio: SAMPLE_VOLUNTEER_PROFILE.bio,
-                    skills: SAMPLE_VOLUNTEER_PROFILE.skills.join(", "),
-                    interests: SAMPLE_VOLUNTEER_PROFILE.interests.join(", "),
-                    availability: SAMPLE_VOLUNTEER_PROFILE.availability
-                });
+                // If profile row doesn't exist yet, prefill full name from user metadata
+                setFormData((prev) => ({
+                    ...prev,
+                    full_name: user.user_metadata?.name || ""
+                }));
             }
         }
 
@@ -92,7 +76,7 @@ export default function VolunteerProfile() {
         setLoading(true);
 
         if (user) {
-            const { error } = await supabase
+            const { error: upsertErr } = await supabase
                 .from("volunteer_profiles")
                 .upsert({
                     id: user.id,
@@ -105,8 +89,8 @@ export default function VolunteerProfile() {
                     availability: formData.availability
                 });
 
-            if (error) {
-                setError(error.message);
+            if (upsertErr) {
+                setError(upsertErr.message);
                 setLoading(false);
                 return;
             }
@@ -114,7 +98,6 @@ export default function VolunteerProfile() {
 
         setSuccessMessage("Profile preferences updated successfully!");
         setLoading(false);
-
         setTimeout(() => setSuccessMessage(""), 4000);
     }
 

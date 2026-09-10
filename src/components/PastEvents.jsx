@@ -7,73 +7,40 @@ export default function PastEvents() {
     const { user } = useAuth();
     const [applications, setApplications] = useState([]);
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function fetchApplications() {
-            if (!user) {
-                // Demo fallback past work record
-                setApplications([
-                    {
-                        id: 901,
-                        status: "completed",
-                        events: {
-                            title: "Urban Tree Planting & Greenery Drive",
-                            location: "Hyderabad",
-                            date: "2026-08-15",
-                            category: "Environment",
-                            ngo_profiles: { organization_name: "Green Earth Foundation" }
-                        }
-                    },
-                    {
-                        id: 902,
-                        status: "completed",
-                        events: {
-                            title: "After-School Primary Mentorship Camp",
-                            location: "Hyderabad",
-                            date: "2026-07-20",
-                            category: "Education",
-                            ngo_profiles: { organization_name: "Bright Future Literacy" }
-                        }
-                    }
-                ]);
-                return;
-            }
+            if (!user) return;
+            setLoading(true);
+            setError("");
 
-            const today = new Date().toISOString().split("T")[0];
+            try {
+                const today = new Date().toISOString().split("T")[0];
 
-            const { data, error } = await supabase
-                .from("applications")
-                .select("id, status, events(title, location, date, category, ngo_profiles(organization_name))")
-                .eq("volunteer_id", user.id)
-                .in("status", ["accepted", "completed"]);
+                const { data, error: fetchErr } = await supabase
+                    .from("applications")
+                    .select("id, status, events(title, location, date, category, ngo_profiles(organization_name))")
+                    .eq("volunteer_id", user.id)
+                    .in("status", ["accepted", "completed"]);
 
-            if (error) {
-                console.error("PAST EVENTS ERROR:", error);
-                setError(error.message);
-                return;
-            }
+                if (fetchErr) {
+                    console.error("PAST EVENTS ERROR:", fetchErr);
+                    setError(fetchErr.message);
+                    setLoading(false);
+                    return;
+                }
 
-            const pastApps = (data || []).filter(
-                (application) => application.events && application.events.date < today
-            );
+                const pastApps = (data || []).filter(
+                    (application) => application.events && application.events.date < today
+                );
 
-            if (pastApps.length === 0) {
-                // Show sample completed events if none in DB
-                setApplications([
-                    {
-                        id: 901,
-                        status: "completed",
-                        events: {
-                            title: "Urban Tree Planting & Greenery Drive",
-                            location: "Hyderabad",
-                            date: "2026-08-15",
-                            category: "Environment",
-                            ngo_profiles: { organization_name: "Green Earth Foundation" }
-                        }
-                    }
-                ]);
-            } else {
                 setApplications(pastApps);
+            } catch (err) {
+                console.error("EXCEPTION:", err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
             }
         }
 
@@ -91,7 +58,11 @@ export default function PastEvents() {
 
             {error && <div className="form-error">{error}</div>}
 
-            {applications.length === 0 ? (
+            {loading ? (
+                <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
+                    <p style={{ color: "var(--color-text-muted)" }}>Loading history...</p>
+                </div>
+            ) : applications.length === 0 ? (
                 <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
                     <Award size={32} color="var(--color-text-light)" style={{ marginBottom: "12px" }} />
                     <h3>No completed drives yet</h3>

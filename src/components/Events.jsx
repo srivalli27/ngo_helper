@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import EventRow from "./EventRow";
-import { SAMPLE_EVENTS, SAMPLE_VOLUNTEER_PROFILE } from "../lib/mockData";
-import { Search, Filter, Compass, MapPin, Sparkles } from "lucide-react";
+import { Compass, Sparkles, RefreshCw } from "lucide-react";
 
 function matchesAvailability(eventDate, availability) {
     if (!availability || availability === "Flexible") {
@@ -36,14 +35,15 @@ function Events() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
+    async function fetchData() {
+        setLoading(true);
+        setError("");
 
-            let currentProfile = SAMPLE_VOLUNTEER_PROFILE;
+        try {
+            let currentProfile = null;
 
             if (user) {
-                const { data: volunteer, error: profileError } = await supabase
+                const { data: volunteer } = await supabase
                     .from("volunteer_profiles")
                     .select("*")
                     .eq("id", user.id)
@@ -51,6 +51,9 @@ function Events() {
 
                 if (volunteer) {
                     currentProfile = volunteer;
+                    if (volunteer.location) {
+                        setLocation(volunteer.location);
+                    }
                 }
             }
 
@@ -58,18 +61,36 @@ function Events() {
 
             const today = new Date().toISOString().split("T")[0];
 
-            let fetchedEvents = [];
+            // Fetch upcoming events with NGO profiles and applications
+            const { data: eventData, error: eventError } = await supabase
+                .from("events")
+                .select("*, ngo_profiles(organization_name), applications(id, status, volunteer_id)")
+                .gte("date", today)
+                .order("date", { ascending: true });
+
+            if (eventError) {
+                console.error("Error fetching events:", eventError);
+                setError(eventError.message);
+                setLoading(false);
+                return;
+            }
+
+            const rawEvents = eventData || [];
+
+            const withRemaining = rawEvents.map((event) => {
+                const accepted = (event.applications || []).filter(
+                    (application) => application.status === "accepted"
+                ).length;
+
+                return {
+                    ...event,
+                    remaining: Math.max(0, event.spots - accepted)
+                };
+            });
+
+            setEvents(withRemaining);
 
             if (user) {
-                const { data: eventData, error: eventError } = await supabase
-                    .from("events")
-                    .select("*, ngo_profiles(organization_name), applications(id, status, volunteer_id)")
-                    .gte("date", today);
-
-                if (!eventError && eventData && eventData.length > 0) {
-                    fetchedEvents = eventData;
-                }
-
                 const { data: applicationData } = await supabase
                     .from("applications")
                     .select("event_id")
@@ -80,67 +101,70 @@ function Events() {
                     setAppliedEvents(applicationData.map((a) => a.event_id));
                 }
             }
-
-            // Fallback to sample events if database has no events yet
-            if (fetchedEvents.length === 0) {
-                fetchedEvents = SAMPLE_EVENTS;
-            }
-
-            const withRemaining = fetchedEvents.map((event) => {
-                const accepted = (event.applications || []).filter(
-                    (application) => application.status === "accepted"
-                ).length;
-
-                const spots = event.spots || 20;
-                const remaining = typeof event.remaining === "number" ? event.remaining : (spots - accepted);
-
-                return {
-                    ...event,
-                    spots,
-                    remaining
-                };
-            });
-
-            setEvents(withRemaining);
+        } catch (err) {
+            console.error("FETCH EVENTS EXCEPTION:", err);
+            setError(err.message);
+        } finally {
             setLoading(false);
         }
+    }
 
+    useEffect(() => {
         fetchData();
     }, [user]);
 
     async function handleApply(event) {
+        if (!user) {
+            setError("Please log in to apply for events.");
+            return;
+        }
+
         if (appliedEvents.includes(event.id)) {
             return;
         }
 
-        if (user) {
-            const { data: existing } = await supabase
+        setError("");
+
+        try {
+            const { data: existing, error: checkError } = await supabase
                 .from("applications")
                 .select("id, status")
                 .eq("event_id", event.id)
                 .eq("volunteer_id", user.id)
                 .maybeSingle();
 
+            if (checkError) {
+                throw checkError;
+            }
+
+            let applyError;
+
             if (existing) {
-                await supabase
+                const result = await supabase
                     .from("applications")
                     .update({ status: "applied" })
                     .eq("id", existing.id);
+                applyError = result.error;
             } else {
-                await supabase
+                const result = await supabase
                     .from("applications")
                     .insert({
                         event_id: event.id,
                         volunteer_id: user.id,
                         status: "applied"
                     });
+                applyError = result.error;
             }
+
+            if (applyError) {
+                throw applyError;
+            }
+
+            setAppliedEvents((prev) => [...prev, event.id]);
+        } catch (err) {
+            console.error("APPLY ERROR:", err);
+            setError(`Failed to apply: ${err.message}`);
         }
-
-        setAppliedEvents([...appliedEvents, event.id]);
-
-        // Optimistically update spots remaining in state
-        setEvents(events.map((e) => e.id === event.id ? { ...e, remaining: Math.max(0, e.remaining - 1) } : e));
     }
 
     const filteredEvents = events.filter((event) => {
@@ -173,16 +197,21 @@ function Events() {
             <div className="page-header">
                 <div>
                     <h1>Available <em>Opportunities.</em></h1>
-                    <p style={{ color: "var(--color-text-muted)" }}>Explore local NGO drives matching your city and schedule</p>
+                    <p style={{ color: "var(--color-text-muted)" }}>Explore community drives matching your city and schedule</p>
                 </div>
+                <button type="button" className="btn-secondary btn-sm" onClick={fetchData}>
+                    <RefreshCw size={14} /> Refresh
+                </button>
             </div>
+
+            {error && <div className="form-error">{error}</div>}
 
             {/* Recommendation banner */}
             <div className="match-notice-banner">
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <Sparkles size={16} />
                     <span>
-                        Showing events matched for <strong>{profile?.location || "Hyderabad"}</strong> ({profile?.availability || "Weekends"} availability).
+                        Showing events matched for <strong>{profile?.location || "your city"}</strong> ({profile?.availability || "flexible"} availability).
                     </span>
                 </div>
                 {location !== "all" && (
@@ -194,7 +223,7 @@ function Events() {
 
             {/* Search & Filter Toolbar */}
             <div className="filter-bar">
-                <div style={{ position: "relative" }}>
+                <div>
                     <input
                         type="text"
                         placeholder="Search drives, NGOs, or locations..."
@@ -233,11 +262,17 @@ function Events() {
             </div>
 
             {/* Table layout */}
-            {sortedEvents.length === 0 ? (
+            {loading ? (
+                <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
+                    <p style={{ color: "var(--color-text-muted)" }}>Loading events from Supabase...</p>
+                </div>
+            ) : sortedEvents.length === 0 ? (
                 <div className="table-container" style={{ padding: "48px", textAlign: "center" }}>
                     <Compass size={32} color="var(--color-text-light)" style={{ marginBottom: "12px" }} />
-                    <h3>No matching drives found</h3>
-                    <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>Try clearing search or changing location filter.</p>
+                    <h3>No upcoming events found</h3>
+                    <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>
+                        Try adjusting search/filters or run the Supabase seed SQL to populate sample events.
+                    </p>
                 </div>
             ) : (
                 <div className="table-container">

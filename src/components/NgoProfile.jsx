@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import { SAMPLE_NGO_PROFILE } from "../lib/mockData";
 import { Save, CheckCircle2 } from "lucide-react";
 
 function toArray(value) {
@@ -31,28 +30,16 @@ export default function NgoProfile() {
 
     useEffect(() => {
         async function fetchProfile() {
-            if (!user) {
-                setFormData({
-                    organization_name: SAMPLE_NGO_PROFILE.organization_name,
-                    contact_person: SAMPLE_NGO_PROFILE.contact_person,
-                    phone: SAMPLE_NGO_PROFILE.phone,
-                    location: SAMPLE_NGO_PROFILE.location,
-                    organization_type: SAMPLE_NGO_PROFILE.organization_type,
-                    causes: SAMPLE_NGO_PROFILE.causes.join(", "),
-                    website: SAMPLE_NGO_PROFILE.website,
-                    description: SAMPLE_NGO_PROFILE.description
-                });
-                return;
-            }
+            if (!user) return;
 
-            const { data, error } = await supabase
+            const { data, error: profileErr } = await supabase
                 .from("ngo_profiles")
                 .select("*")
                 .eq("id", user.id)
                 .maybeSingle();
 
-            if (error) {
-                console.error("PROFILE ERROR:", error);
+            if (profileErr) {
+                console.error("PROFILE ERROR:", profileErr);
             }
 
             if (data) {
@@ -67,16 +54,10 @@ export default function NgoProfile() {
                     description: data.description || ""
                 });
             } else {
-                setFormData({
-                    organization_name: SAMPLE_NGO_PROFILE.organization_name,
-                    contact_person: SAMPLE_NGO_PROFILE.contact_person,
-                    phone: SAMPLE_NGO_PROFILE.phone,
-                    location: SAMPLE_NGO_PROFILE.location,
-                    organization_type: SAMPLE_NGO_PROFILE.organization_type,
-                    causes: SAMPLE_NGO_PROFILE.causes.join(", "),
-                    website: SAMPLE_NGO_PROFILE.website,
-                    description: SAMPLE_NGO_PROFILE.description
-                });
+                setFormData((prev) => ({
+                    ...prev,
+                    organization_name: user.user_metadata?.name || ""
+                }));
             }
         }
 
@@ -97,7 +78,7 @@ export default function NgoProfile() {
         setLoading(true);
 
         if (user) {
-            const { error } = await supabase
+            const { error: upsertErr } = await supabase
                 .from("ngo_profiles")
                 .upsert({
                     id: user.id,
@@ -111,8 +92,8 @@ export default function NgoProfile() {
                     description: formData.description
                 });
 
-            if (error) {
-                setError(error.message);
+            if (upsertErr) {
+                setError(upsertErr.message);
                 setLoading(false);
                 return;
             }
